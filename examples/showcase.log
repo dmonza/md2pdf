@@ -1,0 +1,66 @@
+warning: unknown font family: georgia
+  ┌─ ../tmp/tmp.PfjLlp/final.typ:2:16
+  │
+2 │ #set text(font: ("Georgia", "Liberation Serif", "DejaVu Serif"), size: 11pt, lang: "es", hyphenate: true)
+  │                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unknown font family: segoe ui
+  ┌─ ../tmp/tmp.PfjLlp/final.typ:4:30
+  │
+4 │ #show heading: set text(font: ("Segoe UI", "Helvetica Neue", "Liberation Sans", "DejaVu Sans"))
+  │                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unknown font family: helvetica neue
+  ┌─ ../tmp/tmp.PfjLlp/final.typ:4:30
+  │
+4 │ #show heading: set text(font: ("Segoe UI", "Helvetica Neue", "Liberation Sans", "DejaVu Sans"))
+  │                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unknown font family: segoe ui
+   ┌─ ../tmp/tmp.PfjLlp/final.typ:37:14
+   │
+37 │   #text(font: ("Segoe UI", "Helvetica Neue", "Liberation Sans", "DejaVu Sans"), size: 2.4em, weight: 800)[md2pdf — Ejemplo de capacidades]
+   │               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unknown font family: helvetica neue
+   ┌─ ../tmp/tmp.PfjLlp/final.typ:37:14
+   │
+37 │   #text(font: ("Segoe UI", "Helvetica Neue", "Liberation Sans", "DejaVu Sans"), size: 2.4em, weight: 800)[md2pdf — Ejemplo de capacidades]
+   │               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unknown font family: segoe ui
+   ┌─ ../tmp/tmp.PfjLlp/final.typ:38:24
+   │
+38 │   #v(0.4em) #text(font: ("Segoe UI", "Helvetica Neue", "Liberation Sans", "DejaVu Sans"), size: 1.2em, fill: luma(90))[Callouts, tablas, código y más]
+   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unknown font family: helvetica neue
+   ┌─ ../tmp/tmp.PfjLlp/final.typ:38:24
+   │
+38 │   #v(0.4em) #text(font: ("Segoe UI", "Helvetica Neue", "Liberation Sans", "DejaVu Sans"), size: 1.2em, fill: luma(90))[Callouts, tablas, código y más]
+   │                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unknown font family: cascadia code
+   ┌─ ../tmp/tmp.PfjLlp/final.typ:10:126
+   │
+10 │ #show raw.where(block: false): it => box(fill: luma(240), inset: (x: 3pt, y: 0pt), outset: (y: 3pt), radius: 2pt)[#text(font: ("Cascadia Code", "Consolas", "Liberation Mono", "DejaVu Sans Mono"), size: 0.9em)[#it]]
+   │                                                                                                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unknown font family: consolas
+   ┌─ ../tmp/tmp.PfjLlp/final.typ:10:126
+   │
+10 │ #show raw.where(block: false): it => box(fill: luma(240), inset: (x: 3pt, y: 0pt), outset: (y: 3pt), radius: 2pt)[#text(font: ("Cascadia Code", "Consolas", "Liberation Mono", "DejaVu Sans Mono"), size: 0.9em)[#it]]
+   │                                                                                                                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unknown font family: cascadia code
+   ┌─ ../tmp/tmp.PfjLlp/final.typ:11:150
+   │
+11 │ #show raw.where(block: true): it => block(fill: luma(246), stroke: (left: 2.5pt + rgb("#3584e4")), radius: 4pt, inset: 10pt, width: 100%)[#text(font: ("Cascadia Code", "Consolas", "Liberation Mono", "DejaVu Sans Mono"), size: 9pt)[#it]]
+   │                                                                                                                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unknown font family: consolas
+   ┌─ ../tmp/tmp.PfjLlp/final.typ:11:150
+   │
+11 │ #show raw.where(block: true): it => block(fill: luma(246), stroke: (left: 2.5pt + rgb("#3584e4")), radius: 4pt, inset: 10pt, width: 100%)[#text(font: ("Cascadia Code", "Consolas", "Liberation Mono", "DejaVu Sans Mono"), size: 9pt)[#it]]
+   │                                                                                                                                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+

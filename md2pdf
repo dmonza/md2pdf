@@ -1,0 +1,245 @@
+#!/usr/bin/env bash
+# md2pdf — Markdown técnico -> PDF profesional (pandoc + Typst). Autocontenido.
+# Uso:   md2pdf ENTRADA.md [-o SALIDA.pdf] [opciones]
+set -euo pipefail
+
+VERSION="1.0.0"
+
+usage() {
+  cat <<'USAGE'
+md2pdf — convierte Markdown técnico en un PDF de lectura cómoda.
+
+USO:
+  md2pdf entrada.md [-o salida.pdf] [opciones]
+
+OPCIONES:
+  -o, --output ARCHIVO    PDF de salida (por defecto: mismo nombre .pdf)
+      --toc               Agrega tabla de contenidos
+      --title  "TEXTO"    Genera portada con este título
+      --subtitle "TEXTO"  Subtítulo de portada
+      --author "TEXTO"    Autor en portada
+      --date   "TEXTO"    Fecha en portada (por defecto: hoy si hay --title)
+      --paper  a4|letter  Tamaño de página (por defecto: a4)
+      --sans              Cuerpo en tipografía sans en vez de serif
+      --kindle            Optimiza el PDF para pantalla de e-reader (Kindle):
+                          página chica, márgenes mínimos, texto sin justificar
+      --base-size N       Tamaño de fuente base en pt (por defecto: 11)
+      --keep              No borra el .typ intermedio (para depurar)
+  -h, --help              Esta ayuda
+
+MARCADORES ESPECIALES EN EL MARKDOWN:
+  \newpage                  fuerza un salto de página
+  <!-- pagebreak -->        idem
+  > [!NOTE] / [!TIP] / [!IMPORTANT] / [!WARNING] / [!CAUTION]
+                            se renderizan como cajas de aviso (callouts)
+
+REQUISITOS: pandoc >= 3.1  y  typst >= 0.12  en el PATH.
+USAGE
+}
+
+# ---- parse args ----
+INPUT=""; OUTPUT=""; TOC=0; TITLE=""; SUBTITLE=""; AUTHOR=""; DATE=""
+PAPER="a4"; SANS=0; BASE_SIZE=""; KEEP=0; KINDLE=0
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -o|--output) OUTPUT="$2"; shift 2;;
+    --toc) TOC=1; shift;;
+    --title) TITLE="$2"; shift 2;;
+    --subtitle) SUBTITLE="$2"; shift 2;;
+    --author) AUTHOR="$2"; shift 2;;
+    --date) DATE="$2"; shift 2;;
+    --paper) PAPER="$2"; shift 2;;
+    --sans) SANS=1; shift;;
+    --kindle) KINDLE=1; shift;;
+    --base-size) BASE_SIZE="$2"; shift 2;;
+    --keep) KEEP=1; shift;;
+    -h|--help) usage; exit 0;;
+    -v|--version) echo "md2pdf $VERSION"; exit 0;;
+    -*) echo "Opción desconocida: $1" >&2; exit 2;;
+    *) INPUT="$1"; shift;;
+  esac
+done
+
+[[ -z "$INPUT" ]] && { usage; exit 2; }
+[[ -f "$INPUT" ]] || { echo "No existe el archivo: $INPUT" >&2; exit 1; }
+command -v pandoc >/dev/null || { echo "Falta 'pandoc' en el PATH." >&2; exit 3; }
+command -v typst  >/dev/null || { echo "Falta 'typst' en el PATH." >&2; exit 3; }
+[[ -z "$OUTPUT" ]] && OUTPUT="${INPUT%.*}.pdf"
+
+case "$PAPER" in
+  a4) TYPST_PAPER="a4";;
+  letter) TYPST_PAPER="us-letter";;
+  *) echo "Papel inválido: $PAPER (usá a4 o letter)" >&2; exit 2;;
+esac
+
+if [[ $SANS -eq 1 ]]; then
+  BODY_FONT='("Segoe UI", "Helvetica Neue", "Liberation Sans", "DejaVu Sans")'
+else
+  BODY_FONT='("Georgia", "Liberation Serif", "DejaVu Serif")'
+fi
+
+# Layout según modo: normal (impresión/pantalla) vs kindle (e-reader chico)
+if [[ $KINDLE -eq 1 ]]; then
+  PAGE_SPEC="width: 90mm, height: 120mm"
+  MARGIN_SPEC="(x: 5mm, y: 6mm)"
+  NUMBERING=""
+  JUSTIFY="false"
+  LEADING="0.8em"
+  CODE_SIZE="7.5pt"
+  [[ -z "$BASE_SIZE" ]] && BASE_SIZE="10"
+else
+  PAGE_SPEC="paper: \"$TYPST_PAPER\""
+  MARGIN_SPEC="(x: 2.4cm, y: 2.3cm)"
+  NUMBERING=", numbering: \"1\", number-align: center"
+  JUSTIFY="true"
+  LEADING="0.75em"
+  CODE_SIZE="9pt"
+  [[ -z "$BASE_SIZE" ]] && BASE_SIZE="11"
+fi
+
+TMP="$(mktemp -d)"
+trap '[[ $KEEP -eq 0 ]] && rm -rf "$TMP"' EXIT
+
+# ---- filtro Lua (callouts + saltos de página) ----
+cat > "$TMP/filter.lua" <<'LUA'
+local kinds = { NOTE="note", TIP="tip", IMPORTANT="important", WARNING="warning", CAUTION="caution" }
+function BlockQuote(el)
+  local first = el.content[1]
+  if first and first.t == "Para" and first.content[1] and first.content[1].t == "Str" then
+    local m = first.content[1].text:match("^%[!(%u+)%]$")
+    if m and kinds[m] then
+      table.remove(first.content, 1)
+      if first.content[1] and first.content[1].t == "SoftBreak" then table.remove(first.content, 1) end
+      local inner = pandoc.write(pandoc.Pandoc(el.content), "typst")
+      return pandoc.RawBlock("typst", '#callout(kind: "'..kinds[m]..'")[\n'..inner..'\n]')
+    end
+  end
+end
+function RawBlock(el)
+  local f, t = el.format, el.text
+  if (f == "tex" or f == "latex") and t:match("\\newpage") then
+    return pandoc.RawBlock("typst", "#pagebreak(weak: true)")
+  end
+  if f == "html" and t:match("pagebreak") then
+    return pandoc.RawBlock("typst", "#pagebreak(weak: true)")
+  end
+end
+
+-- Enlaces internos (#anclas) que no coinciden con ningún heading real
+-- (típico en Markdown de LLMs, que usan slugs estilo GitHub distintos
+-- a los que genera Pandoc) rompen la compilación en Typst con un label
+-- inexistente. Si el ancla no existe, se deja el texto plano sin link.
+function Pandoc(doc)
+  local header_ids = {}
+  doc:walk({ Header = function(el) header_ids[el.identifier] = true end })
+  return doc:walk({
+    Link = function(el)
+      local target = el.target
+      if target:sub(1, 1) == "#" and not header_ids[target:sub(2)] then
+        return el.content
+      end
+      return el
+    end
+  })
+end
+
+return {
+  { BlockQuote = BlockQuote, RawBlock = RawBlock },
+  { Pandoc = Pandoc },
+}
+LUA
+
+# ---- preámbulo de estilo (Typst) ----
+cat > "$TMP/preamble.typ" <<PRE
+#set page($PAGE_SPEC, margin: $MARGIN_SPEC$NUMBERING)
+#set text(font: $BODY_FONT, size: ${BASE_SIZE}pt, lang: "es", hyphenate: true)
+#set par(justify: $JUSTIFY, leading: $LEADING, spacing: 1.1em, first-line-indent: 0pt)
+#show heading: set text(font: ("Segoe UI", "Helvetica Neue", "Liberation Sans", "DejaVu Sans"))
+#show heading: set block(above: 1.4em, below: 0.7em)
+#show heading.where(level: 1): set text(size: 1.8em, weight: 700)
+#show heading.where(level: 2): set text(size: 1.35em, weight: 700)
+#show heading.where(level: 3): set text(size: 1.15em, weight: 700)
+#show link: set text(fill: rgb("#1a5fb4"))
+#show raw.where(block: false): it => box(fill: luma(240), inset: (x: 3pt, y: 0pt), outset: (y: 3pt), radius: 2pt)[#text(font: ("Cascadia Code", "Consolas", "Liberation Mono", "DejaVu Sans Mono"), size: 0.9em)[#it]]
+#show raw.where(block: true): it => block(fill: luma(246), stroke: (left: 2.5pt + rgb("#3584e4")), radius: 4pt, inset: 10pt, width: 100%)[#text(font: ("Cascadia Code", "Consolas", "Liberation Mono", "DejaVu Sans Mono"), size: ${CODE_SIZE})[#it]]
+#set table(stroke: (_, y) => if y == 0 { (bottom: 0.8pt + luma(120)) } else { (bottom: 0.4pt + luma(210)) })
+#show table.cell.where(y: 0): set text(weight: "bold")
+
+#let blockquote(body) = block(inset: (left: 14pt, top: 4pt, bottom: 4pt), width: 100%, stroke: (left: 3pt + luma(180)))[#text(fill: luma(90), style: "italic")[#body]]
+
+// Pandoc emite #horizontalrule para las reglas horizontales (---) del Markdown.
+#let horizontalrule = align(center, block(above: 1em, below: 1em)[#line(length: 40%, stroke: 0.5pt + luma(180))])
+
+#let callout(kind: "note", body) = {
+  let cfg = (
+    note:      (rgb("#eaf2fb"), rgb("#1a5fb4"), "NOTA"),
+    tip:       (rgb("#e9f7ef"), rgb("#1a7f43"), "TIP"),
+    important: (rgb("#f3ecfb"), rgb("#7239b3"), "IMPORTANTE"),
+    warning:   (rgb("#fdf3e7"), rgb("#b5670f"), "ATENCIÓN"),
+    caution:   (rgb("#fcebea"), rgb("#c0392b"), "CUIDADO"),
+  )
+  let (bg, accent, label) = cfg.at(kind, default: cfg.note)
+  block(fill: bg, stroke: (left: 3pt + accent), radius: 4pt, inset: 11pt, width: 100%, above: 1em, below: 1em)[
+    #text(weight: "bold", fill: accent, size: 9pt)[#label]
+    #v(-0.3em)
+    #body
+  ]
+}
+PRE
+
+# ---- portada + TOC (opcionales) ----
+FRONT="$TMP/front.typ"; : > "$FRONT"
+esc() { printf '%s' "$1" | sed 's/[#\[\]\\]/\\&/g'; }
+if [[ -n "$TITLE" ]]; then
+  [[ -z "$DATE" ]] && DATE="$(date +%d/%m/%Y)"
+  SANSF='("Segoe UI", "Helvetica Neue", "Liberation Sans", "DejaVu Sans")'
+  {
+    echo "#set page(numbering: none)"
+    echo "#align(center + horizon)["
+    echo "  #text(font: $SANSF, size: 2.4em, weight: 800)[$(esc "$TITLE")]"
+    [[ -n "$SUBTITLE" ]] && echo "  #v(0.4em) #text(font: $SANSF, size: 1.2em, fill: luma(90))[$(esc "$SUBTITLE")]"
+    echo "  #v(2em)"
+    [[ -n "$AUTHOR" ]] && echo "  #text(size: 1.05em)[$(esc "$AUTHOR")] #linebreak()"
+    echo "  #text(fill: luma(110))[$(esc "$DATE")]"
+    echo "]"
+    echo "#pagebreak()"
+    if [[ $KINDLE -eq 0 ]]; then
+      echo "#set page(numbering: \"1\")"
+      echo "#counter(page).update(1)"
+    fi
+  } >> "$FRONT"
+fi
+if [[ $TOC -eq 1 ]]; then
+  {
+    echo "#outline(indent: auto, depth: 3)"
+    echo "#pagebreak(weak: true)"
+  } >> "$FRONT"
+fi
+
+# ---- conversión ----
+# Los avisos (fuentes no encontradas, etc.) de pandoc y typst no se muestran
+# en pantalla: quedan en $LOG. Si algo falla, el detalle se muestra igual.
+LOG="${OUTPUT%.*}.log"
+: > "$LOG"
+
+if ! pandoc "$INPUT" -t typst --lua-filter="$TMP/filter.lua" -o "$TMP/body.typ" 2>>"$LOG"; then
+  cat "$LOG" >&2
+  echo "✗ Falló la conversión con Pandoc (detalle arriba; también en $LOG)" >&2
+  exit 1
+fi
+cat "$TMP/preamble.typ" "$FRONT" "$TMP/body.typ" > "$TMP/final.typ"
+[[ $KEEP -eq 1 ]] && cp "$TMP/final.typ" "${OUTPUT%.*}.typ"
+
+if ! typst compile "$TMP/final.typ" "$OUTPUT" 2>>"$LOG"; then
+  cat "$LOG" >&2
+  echo "✗ Falló la compilación con Typst (detalle arriba; también en $LOG)" >&2
+  exit 1
+fi
+
+if [[ -s "$LOG" ]]; then
+  n="$(grep -c '^' "$LOG")"
+  echo "✓ $OUTPUT  (⚠ $n avisos — ver $LOG)"
+else
+  rm -f "$LOG"
+  echo "✓ $OUTPUT"
+fi

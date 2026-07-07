@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# md2pdf-docker — corre md2pdf dentro de un contenedor. El usuario solo necesita Docker.
+# La primera vez construye la imagen; después reutiliza la caché.
+# Uso idéntico a md2pdf:   md2pdf-docker doc.md --kindle -o salida.pdf
+set -euo pipefail
+
+IMAGE="md2pdf:local"
+# Carpeta donde viven este script, el Dockerfile y md2pdf
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+command -v docker >/dev/null || { echo "Falta Docker. Instalá Docker Desktop." >&2; exit 3; }
+
+# Construir la imagen la primera vez (o si falta el Dockerfile/md2pdf, avisar)
+if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
+  [[ -f "$DIR/Dockerfile" && -f "$DIR/md2pdf" ]] || {
+    echo "No encuentro Dockerfile y md2pdf junto a este script ($DIR)." >&2; exit 1; }
+  echo "Construyendo imagen $IMAGE (solo la primera vez)..." >&2
+  docker build -t "$IMAGE" "$DIR" >&2
+fi
+
+# Montamos el directorio actual como /work: desde ahí el contenedor lee el .md
+# y escribe el .pdf de vuelta en el host. Corré el comando parado en la carpeta del .md.
+exec docker run --rm \
+  -v "$PWD":/work -w /work \
+  -e HOME=/tmp \
+  --user "$(id -u):$(id -g)" \
+  "$IMAGE" "$@"
