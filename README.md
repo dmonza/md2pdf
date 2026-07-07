@@ -24,26 +24,14 @@ No necesitás usar todos: elegí instalación nativa **o** Docker (ver abajo).
 
 ### Opción A — Nativa (pandoc + typst en el PATH)
 
-Más rápida, sin capa de virtualización.
+Más rápida, sin capa de virtualización. Necesitás:
 
-**macOS:**
-```bash
-brew install pandoc typst
-```
+- **Pandoc ≥ 3.1** — instrucciones oficiales: https://pandoc.org/installing.html
+- **Typst ≥ 0.12** — instrucciones oficiales: https://github.com/typst/typst#installation
 
-**Windows (PowerShell + Scoop):**
-```powershell
-scoop install pandoc typst
-```
-> El script `md2pdf` es bash: en Windows nativo corrélo con Git Bash o WSL. Si no querés instalar ninguno de los dos, usá la Opción B (Docker).
+Elegí el método que corresponda a tu SO/arquitectura (gestor de paquetes, binario prebuilt, `cargo install`, etc.) — las páginas oficiales se mantienen más al día que lo que podamos documentar acá.
 
-**Linux (Debian/Ubuntu):**
-```bash
-sudo apt install pandoc
-# Typst no siempre está en los repos de apt; instalá el binario oficial:
-curl -fsSL https://github.com/typst/typst/releases/latest/download/typst-x86_64-unknown-linux-musl.tar.xz | tar -xJ
-sudo mv typst-*/typst /usr/local/bin/
-```
+> En Windows, `md2pdf` es un script bash: corrélo con Git Bash o WSL. Si no querés instalar nada de esto, usá la Opción B (Docker).
 
 Después, en cualquier plataforma:
 ```bash
